@@ -1,0 +1,99 @@
+@()
+
+@main("Register") {
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Create Account</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="registerForm">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                                <div class="form-text">Choose a unique username</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                                <div class="form-text">At least 6 characters</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirmPassword" class="form-label">Confirm Password</label>
+                                <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="biography" class="form-label">Biography</label>
+                                <textarea class="form-control" id="biography" name="biography" rows="3" placeholder="Tell us about yourself..."></textarea>
+                            </div>
+                            <div id="errorAlert" class="alert alert-danger d-none" role="alert"></div>
+                            <div id="successAlert" class="alert alert-success d-none" role="alert"></div>
+                            <button type="submit" class="btn btn-primary w-100">Create Account</button>
+                        </form>
+                        <div class="text-center mt-3">
+                            <a href="/login">Already have an account? Login here</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        $(document).ready(function() {
+            
+            $('#registerForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                const username = $('#username').val();
+                const password = $('#password').val();
+                const confirmPassword = $('#confirmPassword').val();
+                const biography = $('#biography').val() || '';
+                const communityId = 1;
+                
+                if (password !== confirmPassword) {
+                    showError('Passwords do not match');
+                    return;
+                }
+                
+                const hashedPassword = password;
+                
+                $.ajax({
+                    url: '/auth/register',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        username: username,
+                        password: hashedPassword,
+                        biography: biography,
+                        communityId: communityId
+                    }),
+                    success: function(response) {
+                        showSuccess('Account created successfully! Redirecting to login...');
+                        setTimeout(function() {
+                            window.location.href = '/login';
+                        }, 2000);
+                    },
+                    error: function(xhr) {
+                        const error = xhr.responseJSON && xhr.responseJSON.error || 'Registration failed';
+                        showError(error);
+                    }
+                });
+            });
+            
+            
+            function showError(message) {
+                $('#errorAlert').text(message).removeClass('d-none');
+                $('#successAlert').addClass('d-none');
+            }
+            
+            function showSuccess(message) {
+                $('#successAlert').text(message).removeClass('d-none');
+                $('#errorAlert').addClass('d-none');
+            }
+        });
+    </script>
+} 

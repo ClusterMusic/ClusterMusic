@@ -1,0 +1,28 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.key
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.expo/
+dist/
+web-build/
+
+# Scala / sbt
+target/
+project/target/
+project/project/
+.bsp/
+logs/
+RUNNING_PID
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

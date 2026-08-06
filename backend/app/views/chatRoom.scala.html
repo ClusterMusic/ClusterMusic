@@ -1,0 +1,244 @@
+@(roomId: Int)(implicit request: RequestHeader)
+
+@main(s"Chat Room #$roomId") {
+    <div class="container-fluid h-100">
+        <div class="row h-100">
+            
+            <div class="col-md-9 h-100 d-flex flex-column">
+                <div class="chat-header bg-primary text-white p-3">
+                    <h4 class="mb-0">
+                        <i class="fas fa-comments"></i> Chat Room #@roomId
+                        <a href="/chat/rooms" class="btn btn-sm btn-light float-end">
+                            <i class="fas fa-arrow-left"></i> Back to Rooms
+                        </a>
+                    </h4>
+                </div>
+
+                
+                <div id="messages-container" class="flex-grow-1 overflow-auto p-3 bg-light">
+                    <div id="messages"></div>
+                </div>
+
+                
+                <div class="chat-input p-3 bg-white border-top">
+                    <form id="message-form" class="d-flex">
+                        <input type="text" id="message-input" class="form-control me-2" 
+                               placeholder="Type your message..." autocomplete="off">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            
+            <div class="col-md-3 bg-light border-start h-100">
+                <div class="p-3">
+                    <h5><i class="fas fa-users"></i> Online Users</h5>
+                    <ul id="users-list" class="list-unstyled">
+                        
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .container-fluid {
+            height: calc(100vh - 56px);
+        }
+        
+        #messages-container {
+            max-height: calc(100vh - 200px);
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .message.own {
+            background-color: #007bff;
+            color: white;
+            text-align: right;
+            margin-left: 20%;
+        }
+        
+        .message.other {
+            background-color: #e9ecef;
+            margin-right: 20%;
+        }
+        
+        .message .meta {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+        
+        .system-message {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            margin: 10px 0;
+        }
+    </style>
+
+    <script>
+        const roomId = @Html(roomId.toString);
+        const userId = auth.getUserId();
+        const accessToken = auth.getAccessToken();
+        let ws = null;
+        let reconnectTimer = null;
+
+        function connectWebSocket() {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/chat/ws?access_token=${accessToken}&user=${userId}`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                clearTimeout(reconnectTimer);
+                
+                ws.send(JSON.stringify({
+                    typ: 'joinRoom',
+                    roomId: roomId
+                }));
+                
+                ws.send(JSON.stringify({
+                    typ: 'getSnapshot'
+                }));
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket disconnected');
+                reconnectTimer = setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleMessage(data) {
+            switch(data.typ) {
+                case 'userMessage':
+                    displayMessage(data.message);
+                    break;
+                case 'userJoined':
+                    displaySystemMessage(`User ${data.user.value} joined the room`);
+                    break;
+                case 'userLeft':
+                    displaySystemMessage(`User ${data.user.value} left the room`);
+                    break;
+                case 'responseSnapshot':
+                    loadSnapshot(data.snapshot);
+                    break;
+                case 'responseMessages':
+                    loadMessages(data.messages);
+                    break;
+                case 'responseFailed':
+                    alert('Error: ' + data.reason);
+                    break;
+            }
+        }
+
+        function displayMessage(message) {
+            const messagesDiv = $('#messages');
+            const isOwn = message.user.value == userId;
+            
+            const messageHtml = `
+                <div class="message ${isOwn ? 'own' : 'other'}">
+                    <div class="meta">User ${message.user.value} • ${new Date(message.dateTime).toLocaleTimeString()}</div>
+                    <div>${escapeHtml(message.chatMessage || 'Post: ' + message.post.value)}</div>
+                </div>
+            `;
+            
+            messagesDiv.append(messageHtml);
+            scrollToBottom();
+        }
+
+        function displaySystemMessage(text) {
+            const messagesDiv = $('#messages');
+            messagesDiv.append(`<div class="system-message">${escapeHtml(text)}</div>`);
+            scrollToBottom();
+        }
+
+        function loadSnapshot(snapshot) {
+            $('#messages').empty();
+            
+            if (snapshot.messages) {
+                snapshot.messages.forEach(message => displayMessage(message));
+            }
+            
+            if (snapshot.members) {
+                updateUsersList(snapshot.members);
+            }
+        }
+
+        function loadMessages(messages) {
+            messages.forEach(message => displayMessage(message));
+        }
+
+        function updateUsersList(members) {
+            const usersList = $('#users-list');
+            usersList.empty();
+            
+            members.forEach(member => {
+                usersList.append(`<li><i class="fas fa-user"></i> User ${member.value}</li>`);
+            });
+        }
+
+        function scrollToBottom() {
+            const container = $('#messages-container');
+            container.scrollTop(container[0].scrollHeight);
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        $('#message-form').submit(function(e) {
+            e.preventDefault();
+            
+            const input = $('#message-input');
+            const message = input.val().trim();
+            
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    typ: 'sendChat',
+                    sendChatMessage: message
+                }));
+                input.val('');
+            }
+        });
+
+        $(document).ready(function() {
+            if (!userId || !accessToken) {
+                alert('Please login first');
+                window.location.href = '/login';
+                return;
+            }
+            
+            connectWebSocket();
+        });
+
+        $(window).on('beforeunload', function() {
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+} 

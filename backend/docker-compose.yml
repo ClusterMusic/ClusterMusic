@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "9000:9000"
+    env_file:
+      - .env
+    environment:
+      - JAVA_OPTS=${JAVA_OPTS}
+      - APPLICATION_SECRET=${APPLICATION_SECRET:?APPLICATION_SECRET is required}
+      - MONGO_URI=${MONGO_URI}
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+    depends_on:
+      - mysql
+      - mongodb
+    networks:
+      - cluster-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - cluster-network
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:6.0
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD is required}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - cluster-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  mongodb_data:
+
+networks:
+  cluster-network:
+    driver: bridge

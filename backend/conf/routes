@@ -1,0 +1,144 @@
+
+# =============================================================================
+# Authentication Routes
+# =============================================================================
++nocsrf
+POST    /auth/login                     controllers.AuthController.login
++nocsrf
+POST    /auth/register                  controllers.AuthController.register
++nocsrf
+POST    /auth/refresh                   controllers.AuthController.refresh
++nocsrf
+POST    /auth/logout                    controllers.AuthController.logout
++nocsrf
+GET     /auth/validate                  controllers.AuthController.validateToken
+
+# =============================================================================
+# Cluster Routes
+# =============================================================================
+# Get single cluster by ID
++nocsrf
+GET     /clusters/:id                   controllers.ClusterController.cluster(id: model.Identity[model.Cluster], format: String ?= "blob")
+
+# Get multiple clusters with filtering
++nocsrf
+GET     /clusters                       controllers.ClusterController.clusters(format: String ?= "blob", community: Option[model.Identity[model.Community]] ?= None, followed: Option[model.Identity[model.User]] ?= None, parent: Option[model.Identity[model.Cluster]] ?= None)
+
+# =============================================================================
+# Clique Routes  
+# =============================================================================
+# Get single clique by ID
++nocsrf
+GET     /cliques/:id                    controllers.ClusterController.clique(id: model.Identity[model.Clique], format: String ?= "blob")
+
+# Get multiple cliques with filtering
++nocsrf
+GET     /cliques                        controllers.ClusterController.cliques(format: String ?= "blob", member: Option[model.Identity[model.User]] ?= None, followed: Option[model.Identity[model.User]] ?= None, hasPost: Option[model.Identity[model.Post]] ?= None, achievement: Option[model.Identity[model.CliqueAchievement]] ?= None, cluster: Option[model.Identity[model.Cluster]] ?= None)
+
+# =============================================================================
+# User Routes
+# =============================================================================
+# Get single user by ID
++nocsrf
+GET     /users/:id                      controllers.ClusterController.user(id: model.Identity[model.User], format: String ?= "blob")
+
+# Get multiple users with filtering
++nocsrf
+GET     /users                          controllers.ClusterController.users(format: String ?= "blob", community: Option[model.Identity[model.Community]] ?= None, followed: Option[model.Identity[model.User]] ?= None, following: Option[model.Identity[model.User]] ?= None, followingCluster: Option[model.Identity[model.Cluster]] ?= None, followingClique: Option[model.Identity[model.Clique]] ?= None, memberClique: Option[model.Identity[model.Clique]] ?= None, likedPost: Option[model.Identity[model.Post]] ?= None, viewedPost: Option[model.Identity[model.Post]] ?= None, achievement: Option[model.Identity[model.UserAchievement]] ?= None)
+
+# =============================================================================
+# Post Routes
+# =============================================================================
+# Get single post by ID
++nocsrf
+GET     /posts/:id                      controllers.ClusterController.post(id: model.Identity[model.Post], format: String ?= "blob")
+
+# Get multiple posts with filtering
++nocsrf
+GET     /posts                          controllers.ClusterController.posts(format: String ?= "blob", poster: Option[model.Identity[model.User]] ?= None, clique: Option[model.Identity[model.Clique]] ?= None, cluster: Option[model.Identity[model.Cluster]] ?= None, song: Option[model.Identity[model.Song]] ?= None, likedBy: Option[model.Identity[model.User]] ?= None, viewedBy: Option[model.Identity[model.User]] ?= None)
+
+# =============================================================================
+# Radio Routes
+# =============================================================================
+# Get radio feed for different types
++nocsrf
+GET     /radio/user/:userId             controllers.ClusterController.userRadio(userId: model.Identity[model.User], count: Int ?= 10)
++nocsrf
+GET     /radio/clique/:cliqueId         controllers.ClusterController.cliqueRadio(cliqueId: model.Identity[model.Clique], count: Int ?= 10)
++nocsrf
+GET     /radio/cluster/:clusterId       controllers.ClusterController.clusterRadio(clusterId: model.Identity[model.Cluster], count: Int ?= 10)
++nocsrf
+GET     /radio/foryou                   controllers.ClusterController.forYouRadio(count: Int ?= 10)
++nocsrf
+GET     /radio/global                   controllers.ClusterController.globalRadio(count: Int ?= 10)
++nocsrf
+GET     /radio/community/:communityId   controllers.ClusterController.communityRadio(communityId: model.Identity[model.Community], count: Int ?= 10)
++nocsrf
+GET     /radio/following                controllers.ClusterController.followingRadio(count: Int ?= 10)
+
+# =============================================================================
+# Action Routes
+# =============================================================================
+# User actions
++nocsrf
+POST    /actions/follow/user/:id        controllers.ClusterController.followUser(id: model.Identity[model.User])
++nocsrf
+POST    /actions/unfollow/user/:id      controllers.ClusterController.unfollowUser(id: model.Identity[model.User])
+
+# Clique actions
++nocsrf
+POST    /actions/follow/clique/:id      controllers.ClusterController.followClique(id: model.Identity[model.Clique])
++nocsrf
+POST    /actions/unfollow/clique/:id    controllers.ClusterController.unfollowClique(id: model.Identity[model.Clique])
++nocsrf
+POST    /actions/join/clique/:id        controllers.ClusterController.joinClique(id: model.Identity[model.Clique])
++nocsrf
+POST    /actions/leave/clique/:id       controllers.ClusterController.leaveClique(id: model.Identity[model.Clique])
++nocsrf
+POST    /actions/create/clique          controllers.ClusterController.createClique(name: String, biography: String)
+
+# Cluster actions
++nocsrf
+POST    /actions/follow/cluster/:id     controllers.ClusterController.followCluster(id: model.Identity[model.Cluster])
++nocsrf
+POST    /actions/unfollow/cluster/:id   controllers.ClusterController.unfollowCluster(id: model.Identity[model.Cluster])
+
+# Post actions
++nocsrf
+POST    /actions/like/post/:id          controllers.ClusterController.likePost(id: model.Identity[model.Post])
++nocsrf
+POST    /actions/unlike/post/:id        controllers.ClusterController.unlikePost(id: model.Identity[model.Post])
++nocsrf
+POST    /actions/view/post/:id          controllers.ClusterController.viewPost(id: model.Identity[model.Post])
++nocsrf
+POST    /actions/create/post            controllers.ClusterController.createPost()
+
+# =============================================================================
+# Search Routes
+# =============================================================================
++nocsrf
+GET     /search                         controllers.ClusterController.search(query: String, limit: Int ?= 20)
+
+# =============================================================================
+# Profile & Settings Routes
+# =============================================================================
++nocsrf
+POST    /profile/update                 controllers.ClusterController.updateProfile()
++nocsrf
+GET     /settings                       controllers.ClusterController.getSettings()
++nocsrf
+POST    /settings/update                controllers.ClusterController.updateSettings()
+
+# =============================================================================
+# Chat Routes
+# =============================================================================
++nocsrf
+GET     /chat/ws                        controllers.ChatController.chatSocket
++nocsrf
+GET     /chat/rooms/:roomId             controllers.ChatController.chat(roomId: String)
+
+# =============================================================================
+# Static Assets
+# =============================================================================
++nocsrf
+GET     /assets/*file                   controllers.Assets.versioned(path="/public", file: Asset)
