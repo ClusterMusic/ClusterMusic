@@ -10,3 +10,16 @@ Notably, Cluster will have an optional but competitive element to draw engagemen
 Cluster will be entirely open-source for any individual to explore with custom-built chat systems, recommendation algorithms, and more. 
 
 We welcome you to the music game!
+
+
+[VIDEO GOES HERE]
+
+
+## Stress Tests
+
+
+## Documentation
+
+More information about the ClusterMusic application can be found at the following link: https://docs.google.com/document/d/1gbI6useGhHQsjXu1rze9xwgLU5srtOQOM3Jz71vX5Yk/edit?usp=sharing
+
+NOTE: Documentation is incomplete. 
