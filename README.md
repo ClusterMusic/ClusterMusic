@@ -7,7 +7,7 @@ Cluster is designed to be a music-centric social networking app that largely gro
  
 Notably, Cluster will have an optional yet competitive element to drive engagement from the real world and set us apart from traditional social media. Moreover, this competitive element will allow users to organize around smaller social circles to compete against the community as a whole.
 
-Cluster will be **entirely open-source** for any individual to explore with custom-built chat systems, recommendation algorithms, and more.
+Cluster will be **entirely open-source** for any individual to explore with custom-built chat systems, cybersecurity, recommendation algorithms, and more.
 
 We welcome you to the music game!
 
