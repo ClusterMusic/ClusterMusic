@@ -1,0 +1,26 @@
+# Backend secrets — DO NOT COMMIT
+# Values carried over from the previously hardcoded docker-compose.yml / application.conf.
+# These are local development credentials — rotate them before deploying anywhere.
+
+# Play framework application secret (signs session cookies / CSRF tokens)
+APPLICATION_SECRET=cluster-chat-super-secret-key-change-in-production
+
+# MySQL
+MYSQL_ROOT_PASSWORD=rootpassword
+MYSQL_DATABASE=cluster_db
+MYSQL_USER=cluster_user
+MYSQL_PASSWORD=cluster_password
+
+# MongoDB
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=adminpassword
+MONGO_INITDB_DATABASE=cluster_db
+
+# Connection strings used by the app container
+MONGO_URI=mongodb://admin:adminpassword@mongodb:27017/cluster_db?authSource=admin
+DATABASE_URL=jdbc:mysql://mysql:3306/cluster_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+DATABASE_USER=cluster_user
+DATABASE_PASSWORD=cluster_password
+
+# JVM options for the app container
+JAVA_OPTS=-Xmx512m -Xms256m
