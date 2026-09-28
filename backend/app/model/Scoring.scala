@@ -11,12 +11,15 @@ object Scoring {
   val G: Double = 1.8
   val P: Double = 1.2
   val M0: Double = 10
+  val MIN_BIAS: Double = 0.1
+
+  val NO_COMMUNITY_BIAS: Double = -1.0
 
 
   private def cliquePenalty(cliqueSize: Int, activeSize: Int): Double = {
     val ratio = cliqueSize.toDouble / M0
     val basePenalty = math.max(1.0, math.pow(ratio, THETA))
-    val activityFactor = 1 + EPSILON * (cliqueSize - activeSize)
+    val activityFactor = 1 + EPSILON * math.max(0, cliqueSize - activeSize)
     basePenalty * activityFactor
   }
 
@@ -25,7 +28,12 @@ object Scoring {
   }
 
   private def postFactor(postScores: Seq[Double], cliqueSize: Int): Double = {
-    (postScores.map(score => math.sqrt(score)).sum / postScores.size) * Math.log(1 + postScores.size / cliqueSize)
+    if (postScores.isEmpty || cliqueSize <= 0) 0.0
+    else {
+      val meanRootScore = postScores.map(score => math.sqrt(score)).sum / postScores.size
+      val postsPerMember = postScores.size.toDouble / cliqueSize.toDouble
+      meanRootScore * math.log(1 + postsPerMember)
+    }
   }
 
   private def freshness(timeDays: Double): Double = {
@@ -47,15 +55,15 @@ object Scoring {
     math.log(1 + N_Likes + BETA * N_Comments)
   }
 
-  private def postBias(promotedClique: Boolean, communityBias: Double = -1.0, globalBias: Boolean): Double = {
-    val initBias = communityBias match {
-      case -1.0 => 0.0
-      case _ =>
-        val communityBiasComp = math.log(communityBias) / math.log(2)
-        if (globalBias) communityBiasComp * G else communityBiasComp
-    }
+  private def postBias(promotedClique: Boolean, communityBias: Double = NO_COMMUNITY_BIAS, globalBias: Boolean): Double = {
+    val communityBoost =
+      if (communityBias <= 0.0) 0.0
+      else math.log(communityBias) / math.log(2)
 
-    if (promotedClique) P * initBias else initBias
+    val amplified = if (globalBias) communityBoost * G else communityBoost
+    val boost = if (promotedClique) P * amplified else amplified
+    
+    math.max(MIN_BIAS, 1.0 + boost)
   }
 
   private def uniquenessPenalty(N_Songs: Int): Double = {

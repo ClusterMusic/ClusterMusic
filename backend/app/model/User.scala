@@ -48,11 +48,14 @@ case class UserConnection(
                          rank: Double,
                          score: Double
                          ) {
+  def toBlob(communityBlob: CommunityBlob): UserBlob =
+    UserBlob(id, Temp.imageURL, username, biography, communityBlob, rank, score)
+
   def blob(implicit database: Database, ec: ExecutionContext): Future[UserBlob] = {
     val communityQuery = Community.table.filter(_.id === community).result.head
-    database.run(communityQuery).map { communityConn =>
-      UserBlob(id, Temp.imageURL, username, biography, communityConn.blob, rank, score)
-    }.recover(_ => UserBlob(id, Temp.imageURL, username, biography, CommunityBlob(Identity(-1), "Unknown", "unknown", "Unknown", Seq()), rank, score))
+    database.run(communityQuery)
+      .map(communityConn => toBlob(communityConn.blob))
+      .recover(_ => toBlob(Blobs.UnknownCommunity))
   }
 
   def profile(implicit database: Database, ec: ExecutionContext): Future[UserProfile] = {

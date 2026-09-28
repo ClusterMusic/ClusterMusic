@@ -172,7 +172,7 @@ class ClusterController @Inject()(
             Future.successful(Ok(Json.toJson(clusters)))
           }
         case "blob" =>
-          val blobs = Future.sequence(clusters.map(_.blob))
+          val blobs = Blobs.clusters(clusters)
           blobs.map { blobs => Ok(Json.toJson(blobs)) }
         case "profile" =>
           val profiles = Future.sequence(clusters.map(_.profile))
@@ -238,7 +238,8 @@ class ClusterController @Inject()(
              memberClique: Option[Identity[Clique]] = None,
              likedPost: Option[Identity[Post]] = None,
              viewedPost: Option[Identity[Post]] = None,
-             achievement: Option[Identity[UserAchievement]] = None
+             achievement: Option[Identity[UserAchievement]] = None,
+             limit: Int = 20
            ): Action[AnyContent] = optionalUserAction.async { implicit auth_request =>
 
     val baseQuery = User.table.filterOpt(community)(
@@ -309,7 +310,9 @@ class ClusterController @Inject()(
       case None => queryWithViewedPost
     }
 
-    database.run(finalQuery.result).flatMap { users =>
+    val boundedLimit = math.max(1, math.min(limit, 100))
+
+    database.run(finalQuery.take(boundedLimit).result).flatMap { users =>
       format match {
         case "database" =>
           if (auth_request.auth != Authorization.Admin) {
@@ -321,7 +324,7 @@ class ClusterController @Inject()(
             Future.successful(Ok(Json.toJson(users)))
           }
         case "blob" =>
-          val blobs = Future.sequence(users.map(_.blob))
+          val blobs = Blobs.users(users)
           blobs.map { blobs =>
             Ok(Json.toJson(blobs)) }
         case "profile" =>
@@ -526,7 +529,8 @@ class ClusterController @Inject()(
              cluster: Option[Identity[Cluster]] = None,
              song: Option[Identity[Song]] = None,
              likedBy: Option[Identity[User]] = None,
-             viewedBy: Option[Identity[User]] = None
+             viewedBy: Option[Identity[User]] = None,
+             limit: Int = 20
            ): Action[AnyContent] = optionalUserAction.async { implicit auth_request =>
 
     val baseQuery = Post.table
@@ -553,7 +557,9 @@ class ClusterController @Inject()(
       case None => queryWithLikedBy
     }
 
-    database.run(finalQuery.sortBy(_.rank.desc).result).flatMap { posts =>
+    val boundedLimit = math.max(1, math.min(limit, 100))
+
+    database.run(finalQuery.sortBy(_.rank.desc).take(boundedLimit).result).flatMap { posts =>
       format match {
         case "database" =>
           if (auth_request.auth != Authorization.Admin) {
@@ -565,7 +571,7 @@ class ClusterController @Inject()(
             Future.successful(Ok(Json.toJson(posts)))
           }
         case "blob" =>
-          val blobs = Future.sequence(posts.map(_.blob))
+          val blobs = Blobs.posts(posts)
           blobs.map { blobs => Ok(Json.toJson(blobs)) }
         case _ =>
           Future.successful(BadRequest(Json.obj("error" -> "Invalid request format", "details" -> "Invalid layout")))
@@ -584,7 +590,7 @@ class ClusterController @Inject()(
     try {
       val radio = UserRadio(auth_request.user, userId)
       val posts = radio.get(count)
-      Future.sequence(posts.map(_.blob)).map { postBlobs =>
+      Blobs.posts(posts).map { postBlobs =>
         Ok(Json.toJson(postBlobs))
       }
     } catch {
@@ -601,7 +607,7 @@ class ClusterController @Inject()(
     try {
       val radio = CliqueRadio(auth_request.user, cliqueId)
       val posts = radio.get(count)
-      Future.sequence(posts.map(_.blob)).map { postBlobs =>
+      Blobs.posts(posts).map { postBlobs =>
         Ok(Json.toJson(postBlobs))
       }
     } catch {
@@ -618,7 +624,7 @@ class ClusterController @Inject()(
     try {
       val radio = ClusterRadio(auth_request.user, clusterId)
       val posts = radio.get(count)
-      Future.sequence(posts.map(_.blob)).map { postBlobs =>
+      Blobs.posts(posts).map { postBlobs =>
         Ok(Json.toJson(postBlobs))
       }
     } catch {
@@ -634,7 +640,7 @@ class ClusterController @Inject()(
     try {
       val radio = ForYouRadio(auth_request.user, ())
       val posts = radio.get(count)
-      Future.sequence(posts.map(_.blob)).map { postBlobs =>
+      Blobs.posts(posts).map { postBlobs =>
         Ok(Json.toJson(postBlobs))
       }
     } catch {
@@ -886,7 +892,7 @@ class ClusterController @Inject()(
     try {
       val radio = GlobalRadio(auth_request.user, ())
       val posts = radio.get(count)
-      Future.sequence(posts.map(_.blob)).map { postBlobs =>
+      Blobs.posts(posts).map { postBlobs =>
         Ok(Json.toJson(postBlobs))
       }
     } catch {
@@ -903,7 +909,7 @@ class ClusterController @Inject()(
     try {
       val radio = CommunityRadio(auth_request.user, communityId)
       val posts = radio.get(count)
-      Future.sequence(posts.map(_.blob)).map { postBlobs =>
+      Blobs.posts(posts).map { postBlobs =>
         Ok(Json.toJson(postBlobs))
       }
     } catch {
@@ -919,7 +925,7 @@ class ClusterController @Inject()(
     try {
       val radio = FollowingRadio(auth_request.user, ())
       val posts = radio.get(count)
-      Future.sequence(posts.map(_.blob)).map { postBlobs =>
+      Blobs.posts(posts).map { postBlobs =>
         Ok(Json.toJson(postBlobs))
       }
     } catch {
@@ -981,25 +987,48 @@ class ClusterController @Inject()(
             )))
           case None =>
             val now = Timestamp.valueOf(LocalDateTime.now())
-            val relation = UserPostAssociationConnection(
-              auth_request.user,
-              id, 
-              likes = true,
-              views = false,
-              watchCount = 0,
-              lastInteractionDate = Some(now),
-              createdAt = now
-            )
-            
-            database.run(UserPostAssociation.table += relation).map {
-              case 0 => BadRequest(Json.obj(
-                "error" -> "Failed to like post", 
-                "details" -> "Database operation failed"
-              ))
-              case _ => Ok(Json.obj(
-                "message" -> "Post liked successfully",
-                "likedPostId" -> id.value
-              ))
+            val anyExistingRelationQuery = UserPostAssociation.table
+              .filter(assoc => assoc.subj === auth_request.user && assoc.obj === id)
+              .result.headOption
+
+            database.run(anyExistingRelationQuery).flatMap {
+              case Some(_) =>
+                val updateQuery = UserPostAssociation.table
+                  .filter(assoc => assoc.subj === auth_request.user && assoc.obj === id)
+                  .map(assoc => (assoc.likes, assoc.lastInteractionDate))
+                  .update((true, Some(now)))
+
+                database.run(updateQuery).map {
+                  case 0 => BadRequest(Json.obj(
+                    "error" -> "Failed to like post",
+                    "details" -> "Database operation failed"
+                  ))
+                  case _ => Ok(Json.obj(
+                    "message" -> "Post liked successfully",
+                    "likedPostId" -> id.value
+                  ))
+                }
+              case None =>
+                val relation = UserPostAssociationConnection(
+                  auth_request.user,
+                  id,
+                  likes = true,
+                  views = false,
+                  watchCount = 0,
+                  lastInteractionDate = Some(now),
+                  createdAt = now
+                )
+
+                database.run(UserPostAssociation.table += relation).map {
+                  case 0 => BadRequest(Json.obj(
+                    "error" -> "Failed to like post",
+                    "details" -> "Database operation failed"
+                  ))
+                  case _ => Ok(Json.obj(
+                    "message" -> "Post liked successfully",
+                    "likedPostId" -> id.value
+                  ))
+                }
             }
         }
       case None => 
@@ -1048,26 +1077,50 @@ class ClusterController @Inject()(
             }
           case None =>
             val now = Timestamp.valueOf(LocalDateTime.now())
-            val relation = UserPostAssociationConnection(
-              auth_request.user,
-              id, 
-              likes = false,
-              views = true,
-              watchCount = 1,
-              lastInteractionDate = Some(now),
-              createdAt = now
-            )
-            
-            database.run(UserPostAssociation.table += relation).map {
-              case 0 => BadRequest(Json.obj(
-                "error" -> "Failed to record view", 
-                "details" -> "Database operation failed"
-              ))
-              case _ => Ok(Json.obj(
-                "message" -> "Post viewed successfully",
-                "viewedPostId" -> id.value,
-                "watchCount" -> 1
-              ))
+            val anyExistingRelationQuery = UserPostAssociation.table
+              .filter(assoc => assoc.subj === auth_request.user && assoc.obj === id)
+              .result.headOption
+
+            database.run(anyExistingRelationQuery).flatMap {
+              case Some(_) =>
+                val updateQuery = UserPostAssociation.table
+                  .filter(assoc => assoc.subj === auth_request.user && assoc.obj === id)
+                  .map(assoc => (assoc.views, assoc.watchCount, assoc.lastInteractionDate))
+                  .update((true, 1, Some(now)))
+
+                database.run(updateQuery).map {
+                  case 0 => BadRequest(Json.obj(
+                    "error" -> "Failed to record view",
+                    "details" -> "Database operation failed"
+                  ))
+                  case _ => Ok(Json.obj(
+                    "message" -> "Post viewed successfully",
+                    "viewedPostId" -> id.value,
+                    "watchCount" -> 1
+                  ))
+                }
+              case None =>
+                val relation = UserPostAssociationConnection(
+                  auth_request.user,
+                  id,
+                  likes = false,
+                  views = true,
+                  watchCount = 1,
+                  lastInteractionDate = Some(now),
+                  createdAt = now
+                )
+
+                database.run(UserPostAssociation.table += relation).map {
+                  case 0 => BadRequest(Json.obj(
+                    "error" -> "Failed to record view",
+                    "details" -> "Database operation failed"
+                  ))
+                  case _ => Ok(Json.obj(
+                    "message" -> "Post viewed successfully",
+                    "viewedPostId" -> id.value,
+                    "watchCount" -> 1
+                  ))
+                }
             }
         }
       case None => 
@@ -1353,7 +1406,12 @@ class ClusterController @Inject()(
         
         val insertCommentAction = (Comment.table returning Comment.table.map(_.id)) += newComment
         
-        database.run(insertCommentAction).flatMap { commentId =>
+        val insertCommentAndCommunity = for {
+          commentId <- insertCommentAction
+          posterCommunity <- User.table.filter(_.id === auth_request.user).map(_.community).result.head
+        } yield (commentId, posterCommunity)
+
+        database.run(insertCommentAndCommunity).flatMap { case (commentId, posterCommunity) =>
           val newPost = PostConnection(
             id = Identity[Post](0),
             caption = commentId,
@@ -1361,6 +1419,7 @@ class ClusterController @Inject()(
             poster = auth_request.user,
             clique = postReq.cliqueId,
             cluster = postReq.clusterId,
+            community = posterCommunity,
             createdAt = now,
             communityViews = 0,
             globalViews = 0,

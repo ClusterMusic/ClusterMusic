@@ -76,9 +76,12 @@ case class CliqueConnection(
                            score: Double,
                            rank: Double
                          ) {
-  def blob(implicit database: Database, ec: ExecutionContext): Future[CliqueBlob] = {
-    Future.successful(CliqueBlob(id, Temp.imageURL, name, biography, Temp.cliqueTags, score, rank))
-  }
+
+  def toBlob: CliqueBlob =
+    CliqueBlob(id, Temp.imageURL, name, biography, Temp.cliqueTags, score, rank)
+
+  def blob(implicit database: Database, ec: ExecutionContext): Future[CliqueBlob] =
+    Future.successful(toBlob)
 
   def profile(implicit database: Database, ec: ExecutionContext): Future[CliqueProfile] = {
     val membersQuery = UserCliqueAssociation.table.filter(assoc =>

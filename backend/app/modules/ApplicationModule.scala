@@ -218,16 +218,16 @@ class ApplicationModule(environment: Environment, configuration: Configuration) 
               
               // Create posts
               _ <- Post.table ++= Seq(
-                PostConnection(Identity[Post](1), Identity[Comment](1), Identity[Song](1), Identity[User](1), Identity[Clique](1), Identity[Cluster](4), now, 10, 50, 0.8, 200.0),
-                PostConnection(Identity[Post](2), Identity[Comment](2), Identity[Song](2), Identity[User](2), Identity[Clique](2), Identity[Cluster](4), now, 8, 40, 0.7, 180.0),
-                PostConnection(Identity[Post](3), Identity[Comment](3), Identity[Song](3), Identity[User](3), Identity[Clique](3), Identity[Cluster](3), now, 15, 60, 0.9, 250.0),
-                PostConnection(Identity[Post](4), Identity[Comment](4), Identity[Song](4), Identity[User](4), Identity[Clique](4), Identity[Cluster](4), now, 5, 30, 0.5, 120.0),
-                PostConnection(Identity[Post](5), Identity[Comment](5), Identity[Song](5), Identity[User](5), Identity[Clique](5), Identity[Cluster](4), now, 12, 55, 0.75, 190.0),
-                PostConnection(Identity[Post](6), Identity[Comment](6), Identity[Song](6), Identity[User](1), Identity[Clique](1), Identity[Cluster](2), now, 20, 80, 0.85, 300.0),
-                PostConnection(Identity[Post](7), Identity[Comment](7), Identity[Song](7), Identity[User](2), Identity[Clique](2), Identity[Cluster](7), now, 7, 35, 0.6, 150.0),
-                PostConnection(Identity[Post](8), Identity[Comment](8), Identity[Song](8), Identity[User](3), Identity[Clique](3), Identity[Cluster](4), now, 18, 70, 0.82, 220.0),
-                PostConnection(Identity[Post](9), Identity[Comment](9), Identity[Song](9), Identity[User](4), Identity[Clique](4), Identity[Cluster](4), now, 25, 100, 0.95, 350.0),
-                PostConnection(Identity[Post](10), Identity[Comment](10), Identity[Song](10), Identity[User](5), Identity[Clique](5), Identity[Cluster](4), now, 22, 90, 0.88, 280.0)
+                PostConnection(Identity[Post](1), Identity[Comment](1), Identity[Song](1), Identity[User](1), Identity[Clique](1), Identity[Cluster](4), Identity[Community](1), now, 10, 50, 0.8, 200.0),
+                PostConnection(Identity[Post](2), Identity[Comment](2), Identity[Song](2), Identity[User](2), Identity[Clique](2), Identity[Cluster](4), Identity[Community](1), now, 8, 40, 0.7, 180.0),
+                PostConnection(Identity[Post](3), Identity[Comment](3), Identity[Song](3), Identity[User](3), Identity[Clique](3), Identity[Cluster](3), Identity[Community](2), now, 15, 60, 0.9, 250.0),
+                PostConnection(Identity[Post](4), Identity[Comment](4), Identity[Song](4), Identity[User](4), Identity[Clique](4), Identity[Cluster](4), Identity[Community](2), now, 5, 30, 0.5, 120.0),
+                PostConnection(Identity[Post](5), Identity[Comment](5), Identity[Song](5), Identity[User](5), Identity[Clique](5), Identity[Cluster](4), Identity[Community](3), now, 12, 55, 0.75, 190.0),
+                PostConnection(Identity[Post](6), Identity[Comment](6), Identity[Song](6), Identity[User](1), Identity[Clique](1), Identity[Cluster](2), Identity[Community](1), now, 20, 80, 0.85, 300.0),
+                PostConnection(Identity[Post](7), Identity[Comment](7), Identity[Song](7), Identity[User](2), Identity[Clique](2), Identity[Cluster](7), Identity[Community](1), now, 7, 35, 0.6, 150.0),
+                PostConnection(Identity[Post](8), Identity[Comment](8), Identity[Song](8), Identity[User](3), Identity[Clique](3), Identity[Cluster](4), Identity[Community](2), now, 18, 70, 0.82, 220.0),
+                PostConnection(Identity[Post](9), Identity[Comment](9), Identity[Song](9), Identity[User](4), Identity[Clique](4), Identity[Cluster](4), Identity[Community](2), now, 25, 100, 0.95, 350.0),
+                PostConnection(Identity[Post](10), Identity[Comment](10), Identity[Song](10), Identity[User](5), Identity[Clique](5), Identity[Cluster](4), Identity[Community](3), now, 22, 90, 0.88, 280.0)
               )
               
               // Create user-user associations (follows)

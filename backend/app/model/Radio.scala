@@ -10,121 +10,110 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 
-case class Listen(timestamp: Timestamp)
-
-
 abstract class Radio(val viewer: Identity[User]) {
-  val listens: mutable.Map[Identity[Song], Listen] = mutable.Map()
-  var buffer = Seq.empty[PostConnection]
 
-  def get(count: Int)(implicit database: Database, ec: ExecutionContext): Seq[PostConnection] = {
-    var songs = Seq.empty[PostConnection]
+  def get(requestedCount: Int)(implicit database: Database, ec: ExecutionContext): Seq[PostConnection] = {
+    if (requestedCount <= 0) return Seq.empty
 
-    while (songs.size < count) {
-      if (buffer.isEmpty) {
-        buffer = Await.result(next(count), 10.seconds)
-        if (buffer.isEmpty) {
-          return songs
+    val count = math.min(requestedCount, Radio.MAX_PAGE)
+
+    val candidates = Await.result(next(count * Radio.OVER_FETCH), 10.seconds)
+
+    val selected = candidates.distinctBy(_.song).take(count)
+
+    recordViews(selected)
+    selected
+  }
+
+  protected def heardSongIds: Query[Rep[Identity[Song]], Identity[Song], Seq] = {
+    val cutoff = Timestamp.valueOf(LocalDateTime.now().minusSeconds(Radio.TIMESTAMP_EXPIRY.toSeconds))
+
+    UserPostAssociation.table
+      .filter(assoc => assoc.subj === viewer && assoc.views === true)
+      .join(Post.table).on(_.obj === _.id)
+      .filter { case (assoc, _) => assoc.lastInteractionDate.getOrElse(Radio.NeverPlayed) > cutoff }
+      .map { case (_, post) => post.song }
+  }
+
+  private def recordViews(posts: Seq[PostConnection])(implicit database: Database, ec: ExecutionContext): Unit = {
+    if (posts.isEmpty) return
+
+    val now = Timestamp.valueOf(LocalDateTime.now())
+    val valuesClause = List.fill(posts.size)("(?, ?, 0, 1, 1, ?, ?)").mkString(", ")
+    val sql =
+      s"""INSERT INTO user_post_association
+            (subj, obj, likes, views, watch_count, last_interaction_date, created_at)
+          VALUES $valuesClause
+          ON DUPLICATE KEY UPDATE
+            views = 1,
+            watch_count = watch_count + 1,
+            last_interaction_date = VALUES(last_interaction_date)"""
+
+    val action = SimpleDBIO { context =>
+      val statement = context.session.conn.prepareStatement(sql)
+      try {
+        posts.zipWithIndex.foreach { case (post, index) =>
+          val base = index * 4
+          statement.setInt(base + 1, viewer.value)
+          statement.setInt(base + 2, post.id.value)
+          statement.setTimestamp(base + 3, now)
+          statement.setTimestamp(base + 4, now)
         }
-      }
-      
-
-      val nextHead = buffer.head // err
-      buffer = buffer.tail
-      val listen = listens.get(nextHead.song)
-      val now = Timestamp.valueOf(LocalDateTime.now())
-      listen match {
-        case Some(value) =>
-          if (now.getTime - value.timestamp.getTime > Radio.TIMESTAMP_EXPIRY.toMillis) {
-            val newListen = Listen(now)
-            listens.put(nextHead.song, newListen)
-            
-            val existingViewQuery = UserPostAssociation.table
-              .filter(assoc => assoc.subj === viewer && assoc.obj === nextHead.id && assoc.views === true)
-              .result.headOption
-              
-            database.run(existingViewQuery).flatMap {
-              case Some(existing) =>
-                val updateQuery = UserPostAssociation.table
-                  .filter(assoc => assoc.subj === viewer && assoc.obj === nextHead.id)
-                  .map(assoc => (assoc.watchCount, assoc.lastInteractionDate))
-                  .update((existing.watchCount + 1, Some(Timestamp.valueOf(LocalDateTime.now()))))
-                database.run(updateQuery)
-              case None =>
-                val now = Timestamp.valueOf(LocalDateTime.now())
-                val relation = UserPostAssociationConnection(
-                  viewer,
-                  nextHead.id, 
-                  likes = false,
-                  views = true,
-                  watchCount = 1,
-                  lastInteractionDate = Some(now),
-                  createdAt = now
-                )
-                database.run(UserPostAssociation.table += relation)
-            }.recover {
-              case _: Exception => 0
-            }
-            
-            songs = songs :+ nextHead
-          }
-        case None => 
-          val newListen = Listen(now)
-          listens.put(nextHead.song, newListen)
-          
-          val existingViewQuery = UserPostAssociation.table
-            .filter(assoc => assoc.subj === viewer && assoc.obj === nextHead.id && assoc.views === true)
-            .result.headOption
-            
-          database.run(existingViewQuery).flatMap {
-            case Some(existing) =>
-              val updateQuery = UserPostAssociation.table
-                .filter(assoc => assoc.subj === viewer && assoc.obj === nextHead.id)
-                .map(assoc => (assoc.watchCount, assoc.lastInteractionDate))
-                .update((existing.watchCount + 1, Some(Timestamp.valueOf(LocalDateTime.now()))))
-              database.run(updateQuery)
-            case None =>
-              val now = Timestamp.valueOf(LocalDateTime.now())
-              val relation = UserPostAssociationConnection(
-                viewer,
-                nextHead.id, 
-                likes = false,
-                views = true,
-                watchCount = 1,
-                lastInteractionDate = Some(now),
-                createdAt = now
-              )
-              database.run(UserPostAssociation.table += relation)
-          }.recover {
-            case _: Exception => 0
-          }
-          
-          songs = songs :+ nextHead
+        statement.executeUpdate()
+      } finally {
+        statement.close()
       }
     }
-    songs
+
+    database.run(action).recover { case _: Exception => 0 }
+  }
+
+  protected def incrementViewCounter(
+    column: String,
+    ids: Seq[Identity[Post]]
+  )(implicit database: Database, ec: ExecutionContext): Future[Int] = {
+    if (ids.isEmpty) return Future.successful(0)
+
+    val placeholders = List.fill(ids.size)("?").mkString(", ")
+    val sql = s"UPDATE post SET $column = $column + 1 WHERE id IN ($placeholders)"
+
+    val action = SimpleDBIO { context =>
+      val statement = context.session.conn.prepareStatement(sql)
+      try {
+        ids.zipWithIndex.foreach { case (id, index) => statement.setInt(index + 1, id.value) }
+        statement.executeUpdate()
+      } finally {
+        statement.close()
+      }
+    }
+
+    database.run(action).recover { case _: Exception => 0 }
   }
 
   protected def next(count: Int)(implicit database: Database, ec: ExecutionContext): Future[Seq[PostConnection]]
 }
 
 abstract class RadioType[T <: Radio, A] {
-  val radios = mutable.Map[Identity[User], T]()
 
   protected def create(viewer: Identity[User], arg: A): T
 
-  def apply(viewer: Identity[User], arg: A): T = {
-    radios.getOrElseUpdate(viewer, create(viewer, arg))
-  }
+
+  def apply(viewer: Identity[User], arg: A): T = create(viewer, arg)
 }
 
 object Radio {
   val TIMESTAMP_EXPIRY = 1.day
+
+  val MAX_PAGE = 100
+
+  val OVER_FETCH = 1
+
+  val NeverPlayed: Timestamp = new Timestamp(0L)
 }
 
 class UserRadio(override val viewer: Identity[User], val user: Identity[User]) extends Radio(viewer) {
   override def next(count: Int)(implicit database: Database, ec: ExecutionContext): Future[Seq[PostConnection]] = {
-    val query = Post.table.filter(_.poster === user).sortBy(_.rank.desc).take(count).result
+    val query = Post.table.filter(_.poster === user).filterNot(_.song in heardSongIds).sortBy(_.rank.desc).take(count).result
     database.run(query)
   }
 }
@@ -136,7 +125,7 @@ object UserRadio extends RadioType[UserRadio, Identity[User]] {
 
 class CliqueRadio(override val viewer: Identity[User], val clique: Identity[Clique]) extends Radio(viewer) {
   override def next(count: Int)(implicit database: Database, ec: ExecutionContext): Future[Seq[PostConnection]] = {
-    val query = Post.table.filter(_.clique === clique).sortBy(_.rank.desc).take(count).result
+    val query = Post.table.filter(_.clique === clique).filterNot(_.song in heardSongIds).sortBy(_.rank.desc).take(count).result
     database.run(query)
   }
 }
@@ -149,7 +138,7 @@ object CliqueRadio extends RadioType[CliqueRadio, Identity[Clique]] {
 
 class ClusterRadio(override val viewer: Identity[User], val cluster: Identity[Cluster]) extends Radio(viewer) {
   override def next(count: Int)(implicit database: Database, ec: ExecutionContext): Future[Seq[PostConnection]] = {
-    val query = Post.table.filter(_.cluster === cluster).sortBy(_.rank.desc).take(count).result
+    val query = Post.table.filter(_.cluster === cluster).filterNot(_.song in heardSongIds).sortBy(_.rank.desc).take(count).result
     database.run(query)
   }
 }
@@ -161,14 +150,11 @@ object ClusterRadio extends RadioType[ClusterRadio, Identity[Cluster]] {
 
 class GlobalRadio(override val viewer: Identity[User], val none: Unit) extends Radio(viewer) {
   override def next(count: Int)(implicit database: Database, ec: ExecutionContext): Future[Seq[PostConnection]] = {
-    val query = Post.table.sortBy(_.rank.desc).take(count).result
+    val query = Post.table.filterNot(_.song in heardSongIds).sortBy(_.rank.desc).take(count).result
 
     for {
       posts <- database.run(query)
-      _ <- Future.sequence(posts.map { post =>
-        val updated = post.copy(globalViews = post.globalViews + 1)
-        database.run(Post.table.filter(_.id === post.id).update(updated))
-      })
+      _ <- incrementViewCounter("global_views", posts.map(_.id))
     } yield posts
   }
 }
@@ -178,14 +164,11 @@ object GlobalRadio extends RadioType[GlobalRadio, Unit] {
 
 class CommunityRadio(override val viewer: Identity[User], val community: Identity[Community]) extends Radio(viewer) {
   override def next(count: Int)(implicit database: Database, ec: ExecutionContext): Future[Seq[PostConnection]] = {
-    val query = Post.table.join(User.table).on(_.poster === _.id).filter(_._2.community === community).sortBy(_._1.rank.desc).take(count).result
+    val query = Post.table.filter(_.community === community).filterNot(_.song in heardSongIds).sortBy(_.rank.desc).take(count).result
 
     for {
-      posts <- database.run(query).map(posts => posts.map(_._1))
-      _ <- Future.sequence(posts.map { post =>
-        val updated = post.copy(communityViews = post.communityViews + 1)
-        database.run(Post.table.filter(_.id === post.id).update(updated))
-      })
+      posts <- database.run(query)
+      _ <- incrementViewCounter("community_views", posts.map(_.id))
     } yield posts
     
   }
@@ -196,7 +179,7 @@ object CommunityRadio extends RadioType[CommunityRadio, Identity[Community]] {
 
 class FollowingRadio(override val viewer: Identity[User], val none: Unit) extends Radio(viewer) {
   override def next(count: Int)(implicit database: Database, ec: ExecutionContext): Future[Seq[PostConnection]] = {
-    val query = Post.table.join(UserUserAssociation.table).on(_.poster === _.obj).filter( x => x._2.subj === viewer && x._2.follows === true).sortBy(_._1.rank.desc).take(count).result
+    val query = Post.table.filterNot(_.song in heardSongIds).join(UserUserAssociation.table).on(_.poster === _.obj).filter( x => x._2.subj === viewer && x._2.follows === true).sortBy(_._1.rank.desc).take(count).result
     database.run(query).map(posts => posts.map(_._1))
   }
 }
@@ -214,12 +197,12 @@ class ForYouRadio(override val viewer: Identity[User], val none: Unit) extends R
     val communityPostsQuery = for {
       userCommunity <- userCommunityQuery
       posts <- Post.table
-        .join(User.table).on(_.poster === _.id)
-        .filter(_._2.community === userCommunity)
-        .sortBy(_._1.rank.desc)
+        .filter(_.community === userCommunity)
+        .filterNot(_.song in heardSongIds)
+        .sortBy(_.rank.desc)
         .take(count)
         .result
-    } yield posts.map(_._1)
+    } yield posts
     
     database.run(communityPostsQuery).recover(_ => Seq.empty)
   }
@@ -236,6 +219,7 @@ class ForYouRadio(override val viewer: Identity[User], val none: Unit) extends R
       followingUsers <- followingUsersQuery
       posts <- Post.table
         .filter(_.poster.inSet(followingUsers))
+        .filterNot(_.song in heardSongIds)
         .sortBy(_.rank.desc)
         .take(count)
         .result
@@ -248,6 +232,7 @@ class ForYouRadio(override val viewer: Identity[User], val none: Unit) extends R
     if (count <= 0) return Future.successful(Seq.empty)
     
     val globalPostsQuery = Post.table
+      .filterNot(_.song in heardSongIds)
       .sortBy(_.rank.desc)
       .take(count)
       .result

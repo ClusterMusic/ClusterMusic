@@ -44,7 +44,7 @@ GET     /users/:id                      controllers.ClusterController.user(id: m
 
 # Get multiple users with filtering
 +nocsrf
-GET     /users                          controllers.ClusterController.users(format: String ?= "blob", community: Option[model.Identity[model.Community]] ?= None, followed: Option[model.Identity[model.User]] ?= None, following: Option[model.Identity[model.User]] ?= None, followingCluster: Option[model.Identity[model.Cluster]] ?= None, followingClique: Option[model.Identity[model.Clique]] ?= None, memberClique: Option[model.Identity[model.Clique]] ?= None, likedPost: Option[model.Identity[model.Post]] ?= None, viewedPost: Option[model.Identity[model.Post]] ?= None, achievement: Option[model.Identity[model.UserAchievement]] ?= None)
+GET     /users                          controllers.ClusterController.users(format: String ?= "blob", community: Option[model.Identity[model.Community]] ?= None, followed: Option[model.Identity[model.User]] ?= None, following: Option[model.Identity[model.User]] ?= None, followingCluster: Option[model.Identity[model.Cluster]] ?= None, followingClique: Option[model.Identity[model.Clique]] ?= None, memberClique: Option[model.Identity[model.Clique]] ?= None, likedPost: Option[model.Identity[model.Post]] ?= None, viewedPost: Option[model.Identity[model.Post]] ?= None, achievement: Option[model.Identity[model.UserAchievement]] ?= None, limit: Int ?= 20)
 
 # =============================================================================
 # Post Routes
@@ -55,7 +55,7 @@ GET     /posts/:id                      controllers.ClusterController.post(id: m
 
 # Get multiple posts with filtering
 +nocsrf
-GET     /posts                          controllers.ClusterController.posts(format: String ?= "blob", poster: Option[model.Identity[model.User]] ?= None, clique: Option[model.Identity[model.Clique]] ?= None, cluster: Option[model.Identity[model.Cluster]] ?= None, song: Option[model.Identity[model.Song]] ?= None, likedBy: Option[model.Identity[model.User]] ?= None, viewedBy: Option[model.Identity[model.User]] ?= None)
+GET     /posts                          controllers.ClusterController.posts(format: String ?= "blob", poster: Option[model.Identity[model.User]] ?= None, clique: Option[model.Identity[model.Clique]] ?= None, cluster: Option[model.Identity[model.Cluster]] ?= None, song: Option[model.Identity[model.Song]] ?= None, likedBy: Option[model.Identity[model.User]] ?= None, viewedBy: Option[model.Identity[model.User]] ?= None, limit: Int ?= 20)
 
 # =============================================================================
 # Radio Routes

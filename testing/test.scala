@@ -11,7 +11,9 @@ class StressTest extends Simulation {
     .baseUrl("https://api.example.com")           // <-- change to your base URL
     .acceptHeader("application/json")
     .contentTypeHeader("application/json")
-    .header("Authorization", "Bearer YOUR_TOKEN_HERE") // <-- or however your auth works
+    .header("Authorization", "Bearer YOUR_TOKEN_HERE") // empty token for Bad Guardian
+
+    def httpProtocol = 
 
   // ---- 2. The request(s) being tested ----
   val getOrders = exec(
@@ -19,6 +21,8 @@ class StressTest extends Simulation {
       .get("/v1/orders")
       .check(status.is(200))
   )
+
+
 
   val createOrder = exec(
     http("Create Order")

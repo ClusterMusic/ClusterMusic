@@ -10,6 +10,7 @@ lazy val root = (project in file("."))
 val playSlickVersion = "6.1.0"
 val mongoDriverVersion = "4.11.1"
 val jwtVersion = "10.0.1"
+val pekkoVersion = "1.0.2" 
 
 libraryDependencies ++= Seq(
   guice,                      
@@ -28,8 +29,8 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= Seq(
   "org.scalatestplus.play" %% "scalatestplus-play"        % "7.0.1"  % Test,
   "org.scalatestplus"      %% "scalacheck-1-17"           % "3.2.18.0" % Test,
-  "org.apache.pekko"       %% "pekko-testkit"             % "1.0.3"  % Test,
-  "org.apache.pekko"       %% "pekko-actor-testkit-typed" % "1.0.3"  % Test
+  "org.apache.pekko"       %% "pekko-testkit"             % pekkoVersion % Test,
+  "org.apache.pekko"       %% "pekko-actor-testkit-typed" % pekkoVersion % Test
 )
 
 PlayKeys.playDefaultPort := 9000

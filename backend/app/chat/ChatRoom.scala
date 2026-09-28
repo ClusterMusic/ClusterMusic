@@ -37,7 +37,7 @@ class ChatRoomActor(chatRoom: ChatRoom, chatService: ActorRef)(implicit ec: Exec
 
 
   override def postStop(): Unit = {
-    viewers.foreach(_ ! ClosedRoom)
+    viewers.foreach(_ ! ClosedRoom())
     chatService ! WriteSnapshot(ChatRoom(chatRoom.id, members.toSeq, messages.toSeq))
   }
 
@@ -96,11 +96,13 @@ class ChatRoomActor(chatRoom: ChatRoom, chatService: ActorRef)(implicit ec: Exec
         val message = ChatMessage(user, messageStr)
         messages += message
         broadcast(ChatEvent.MessageEvent(message, chatRoom.id))
+        sender() ! ChatEvent.ResponseActionSuccess()
 
       case UserAction.SendPost(post: Identity[Post]) =>
         val message = PostMessage(user, post)
         messages += message
         broadcast(ChatEvent.MessageEvent(message, chatRoom.id))
+        sender() ! ChatEvent.ResponseActionSuccess()
 
       case UserAction.GetMessages(timestamp: Instant, _limit: Int) =>
         val rec = sender()

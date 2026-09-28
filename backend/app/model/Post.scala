@@ -32,6 +32,7 @@ case class PostConnection(
                            poster: Identity[User],
                            clique: Identity[Clique],
                            cluster: Identity[Cluster],
+                           community: Identity[Community],
                            createdAt: Timestamp,
                            communityViews: Int,
                            globalViews: Int,
@@ -106,7 +107,7 @@ case class PostConnection(
                               commentsN = comments.length
                               nSongs = posterSongs.length
                               promotedClique = true
-                              communityBias = if(communityViews > 5) 1.0 else -1.0
+                              communityBias = if(communityViews > 5) 1.0 else Scoring.NO_COMMUNITY_BIAS
                               globalBias = globalViews > 5
                               newScore = Scoring.postScore(promotedClique, communityBias, globalBias, viewsN, rewatchViewsN, likesN, commentsN, nSongs)
                               out <- database.run(sqlu"UPDATE post SET score = $newScore WHERE id = ${id.value}")
@@ -123,6 +124,7 @@ class PostTable(tag: Tag) extends Table[PostConnection](tag, "post") {
   def poster = column[Identity[User]]("poster_id")
   def clique = column[Identity[Clique]]("clique_id")
   def cluster = column[Identity[Cluster]]("cluster_id")
+  def community = column[Identity[Community]]("community_id")
   def createdAt = column[Timestamp]("created_at")
   def communityViews = column[Int]("community_views")
   def globalViews = column[Int]("global_views")
@@ -134,7 +136,8 @@ class PostTable(tag: Tag) extends Table[PostConnection](tag, "post") {
   def idxClique = index("idx_post_clique", clique)
   def idxCluster = index("idx_post_cluster", cluster)
   def idxCreatedAt = index("idx_post_created_at", createdAt)
+  def idxCommunityRank = index("idx_post_community_rank", (community, rank))
 
-  override def * : ProvenShape[PostConnection] = (id, caption, song, poster, clique, cluster, createdAt, communityViews, globalViews, rank, score).mapTo[PostConnection]
+  override def * : ProvenShape[PostConnection] = (id, caption, song, poster, clique, cluster, community, createdAt, communityViews, globalViews, rank, score).mapTo[PostConnection]
 }
 

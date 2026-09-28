@@ -31,17 +31,19 @@ case class SongConnection(
     createdAt: Timestamp,
     score: Int
 ) {
-  def blob(implicit database: Database, ec: ExecutionContext): Future[SongBlob] = {
-    Future.successful(SongBlob(
-      id = id,
-      title = title,
-      artist = "Unknown Artist",
-      album = "Unknown Album",
-      duration = "3:30",
-      spotifyId = spotify_id.map(_.value.toString),
-      appleMusicId = apple_music_id.map(_.value.toString)
-    ))
-  }
+
+  def toBlob: SongBlob = SongBlob(
+    id = id,
+    title = title,
+    artist = "Unknown Artist",
+    album = "Unknown Album",
+    duration = "3:30",
+    spotifyId = spotify_id.map(_.value.toString),
+    appleMusicId = apple_music_id.map(_.value.toString)
+  )
+
+  def blob(implicit database: Database, ec: ExecutionContext): Future[SongBlob] =
+    Future.successful(toBlob)
 }
 
 class SongTable(tag: Tag) extends Table[SongConnection](tag, "song") {

@@ -39,11 +39,15 @@ case class ClusterConnection(
                            parentCommunityId: Identity[Community],
                            createdAt: Timestamp
                          ) {
+
+  def toBlob(communityBlob: CommunityBlob): ClusterBlob =
+    ClusterBlob(id, Temp.imageURL, title, communityBlob, Temp.clusterTags)
+
   def blob(implicit database: Database, ec: ExecutionContext): Future[ClusterBlob] = {
     val communityQuery = Community.table.filter(_.id === parentCommunityId).result.head
-    database.run(communityQuery).map { community =>
-      ClusterBlob(id, Temp.imageURL, title, community.blob, Temp.clusterTags)
-    }.recover(_ => ClusterBlob(id, Temp.imageURL, title, CommunityBlob(Identity(-1), "Unknown", "unknown", "Unknown", Seq()), Temp.clusterTags))
+    database.run(communityQuery)
+      .map(community => toBlob(community.blob))
+      .recover(_ => toBlob(Blobs.UnknownCommunity))
   }
 
   def profile(implicit database: Database, ec: ExecutionContext): Future[ClusterProfile] = {
